@@ -1,5 +1,6 @@
 import express from "express";
-import { renderToString } from "react-dom/server";
+// import { renderToString } from "react-dom/server";
+import { renderToNodeStream } from "react-dom/server";
 // import { ServerLocation } from "react-router-dom";
 import { StaticRouter } from "react-router-dom";
 import fs from "fs";
@@ -15,6 +16,7 @@ const app = express();
 
 app.use("/dist", express.static("dist"));
 app.use((req, res) => {
+  res.write(parts[0]);
   const staticContext = {};
   const reactMarkup = (
     <StaticRouter url={req.url} context={staticContext}>
@@ -22,9 +24,13 @@ app.use((req, res) => {
     </StaticRouter>
   );
 
-  res.status(staticContext.statusCode || 200);
-  res.send(`${parts[0]}${renderToString(reactMarkup)}${parts[1]}`);
-  res.end();
+  const stream = renderToNodeStream(reactMarkup);
+  stream.pipe(res, { end: false });
+  stream.on("end", () => {
+      res.status(staticContext || 200);
+      res.write(parts[1]);
+      res.end();
+  })
 });
 
 console.log(`listening on port http://localhost:${PORT}`);
